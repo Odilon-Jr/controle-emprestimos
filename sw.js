@@ -1,9 +1,22 @@
 // Service worker — cacheia o app para abrir offline e permitir instalação (PWA).
 // Não toca em dados: o banco fica no localStorage do navegador.
 
-const VERSAO = 'v1';
+const VERSAO = 'v3';
 const CACHE_APP = `emprestimos-app-${VERSAO}`;
 const CACHE_EXTRA = 'emprestimos-runtime';
+
+const CDN = 'https://cdn.jsdelivr.net/npm';
+
+// Dependências externas: guardadas já na instalação para o app instalado
+// funcionar mesmo sem internet (na primeira visita o SW ainda não controla a página).
+const ARQUIVOS_CDN = [
+  `${CDN}/bootstrap@5.3.3/dist/css/bootstrap.min.css`,
+  `${CDN}/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js`,
+  `${CDN}/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css`,
+  `${CDN}/bootstrap-icons@1.11.3/font/fonts/bootstrap-icons.woff2`,
+  `${CDN}/bootstrap-icons@1.11.3/font/fonts/bootstrap-icons.woff`,
+  `${CDN}/chart.js@4.4.4/dist/chart.umd.min.js`
+];
 
 const ARQUIVOS_APP = [
   './',
@@ -19,9 +32,12 @@ const ARQUIVOS_APP = [
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_APP)
-      .then((cache) => cache.addAll(ARQUIVOS_APP))
-      .then(() => self.skipWaiting())
+    caches.open(CACHE_APP).then(async (cache) => {
+      await cache.addAll(ARQUIVOS_APP);
+      // CDN não pode derrubar a instalação do app se falhar
+      await Promise.allSettled(ARQUIVOS_CDN.map((url) => cache.add(url)));
+      await self.skipWaiting();
+    })
   );
 });
 
@@ -60,7 +76,7 @@ self.addEventListener('fetch', (event) => {
   // CDN (Bootstrap, Chart.js, ícones): cache primeiro.
   if (url.origin !== self.location.origin) {
     event.respondWith(
-      caches.match(req).then((emCache) => emCache || fetch(req).then((resp) => {
+      caches.match(req, { ignoreVary: true }).then((emCache) => emCache || fetch(req).then((resp) => {
         if (resp && (resp.ok || resp.type === 'opaque')) {
           const copia = resp.clone();
           caches.open(CACHE_EXTRA).then((cache) => cache.put(req, copia));

@@ -100,6 +100,38 @@
         });
       });
     }
+
+    // Aviso visível quando o app quebra: sem isso, erro de JS deixa a tela muda.
+    (function () {
+      function mostrar(titulo, detalhe) {
+        var box = document.getElementById('appErro');
+        if (!box) {
+          box = document.createElement('div');
+          box.id = 'appErro';
+          box.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#b00020;color:#fff;padding:12px 14px;font:13px/1.4 system-ui,sans-serif;max-height:45vh;overflow:auto;border-bottom:2px solid #fff';
+          document.body.appendChild(box);
+        }
+        box.textContent = titulo + ': ' + String(detalhe).slice(0, 600);
+      }
+      window.addEventListener('error', function (e) {
+        var origem = e.filename ? ' (' + e.filename.split('/').pop() + ':' + e.lineno + ')' : '';
+        mostrar('Erro no app', (e.message || 'falha ao carregar um arquivo') + origem);
+      });
+      window.addEventListener('unhandledrejection', function (e) {
+        var r = e.reason;
+        mostrar('Erro no app', (r && (r.stack || r.message)) || String(r));
+      });
+      window.addEventListener('load', function () {
+        setTimeout(function () {
+          var dash = document.getElementById('page-dashboard');
+          if (!dash || !dash.innerHTML.trim()) {
+            mostrar('O app não iniciou', 'App=' + (typeof window.App) +
+              ' | dashboard vazio | service worker=' + (!!navigator.serviceWorker.controller) +
+              ' | bootstrap=' + (typeof window.bootstrap));
+          }
+        }, 2500);
+      });
+    })();
   </script>
 </body>
 </html>
